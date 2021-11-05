@@ -5,13 +5,16 @@ from flumine.utils import get_sp, get_price
 
 logger = logging.getLogger(__name__)
 FIELDNAMES = [
+    "datetime",
     "market_id",
     "market_seconds_to_start",
     "market_total_matched",
     "selection_id",
     "selection_back",
     "selection_lay",
-    "selection_wom",
+    "selection_wom_one",
+    "selection_wom_two",
+    "selection_wom_three",
     "selection_total_matched",
     "selection_status",
     "selection_actual_sp",
@@ -54,9 +57,12 @@ class DataCollectWOM(BaseStrategy):
                 # get prices
                 back, lay = _get_back_lay(runner)
                 # calculate WOM
-                wom = _calculate_wom(runner)
-
+                wom_one = _calculate_wom(runner, 1)
+                wom_two = _calculate_wom(runner, 2)
+                wom_three = _calculate_wom(runner, 3)
+                # store data in context
                 data = {
+                    "datetime": market_book.publish_time,
                     # market
                     "market_id": market.market_id[2:],
                     "market_seconds_to_start": market.seconds_to_start,
@@ -66,7 +72,9 @@ class DataCollectWOM(BaseStrategy):
                     # current state
                     "selection_back": back,
                     "selection_lay": lay,
-                    "selection_wom": wom,
+                    "selection_wom_one": wom_one,
+                    "selection_wom_two": wom_two,
+                    "selection_wom_three": wom_three,
                     "selection_total_matched": runner.total_matched,
                     # after
                     "selection_status": None,
@@ -97,5 +105,16 @@ def _get_back_lay(runner_book, level: int = 0) -> tuple:
     return back, lay
 
 
-def _calculate_wom(runner_book):
-    pass
+def _calculate_wom(runner_book, depth: int) -> float:
+    total_atb, total_atl = 0, 0
+    for i in range(0, depth):
+        # back
+        p = runner_book.ex.available_to_back[i]
+        total_atb += p["size"]
+        # lay
+        p = runner_book.ex.available_to_lay[i]
+        total_atl += p["size"]
+    if total_atb + total_atl > 0:
+        return round(total_atb / (total_atb + total_atl), 4)
+    else:
+        return 0
